@@ -350,8 +350,9 @@ function initMap() {
 
     L.control.zoom({ position: 'bottomright' }).addTo(map);
 
+    // OpenStreetMap — bekerja sempurna di GitHub Pages
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution: '© <a href="https://openstreetmap.org/copyright">OpenStreetMap</a> contributors',
         maxZoom: 19
     }).addTo(map);
 
@@ -503,9 +504,10 @@ function updateCharts(stats) {
     renderRekapGrid(stats);
     buildBarChart(stats);
     buildPieChart(stats);
-    buildGenderChart(stats);
+    // buildGenderChart dihapus — pesantren khusus santri laki-laki
     buildStatusChart(stats);
     buildKeluhanChart(stats);
+    buildTrendChart(stats);
 }
 
 // ── Rekap Grid (Ringkasan Cepat) ──────────────────
@@ -518,9 +520,7 @@ function renderRekapGrid(stats) {
         { color: 'gold',   icon: 'fa-viruses',       val: totalLaporan, lbl: 'Total Laporan' },
         { color: 'green',  icon: 'fa-check-circle',  val: stats.sembuh, lbl: 'Sudah Sembuh' },
         { color: 'blue',   icon: 'fa-pills',         val: stats.berobat,lbl: 'Sedang Berobat' },
-        { color: 'purple', icon: 'fa-mars',           val: stats.lakiLaki,   lbl: 'Laki-laki' },
-        { color: 'pink',   icon: 'fa-venus',          val: stats.perempuan,  lbl: 'Perempuan' },
-        { color: 'gold',   icon: 'fa-percent',        val: pctSembuh + '%',  lbl: 'Tingkat Sembuh' },
+        { color: 'gold',   icon: 'fa-percent',       val: pctSembuh + '%', lbl: 'Tingkat Sembuh' },
     ];
     el.innerHTML = cards.map(c => `
         <div class="rekap-card ${c.color}">
@@ -913,9 +913,11 @@ function renderTable(rows) {
         const tanggal = formatTanggal(r.tanggalLaporan || r.timestamp);
         const pesantrenShort = getPesantrenShort(r.namaPesantren);
         const genderIcon = getGenderIcon(r.jenisKelamin);
+        // encode data row untuk dikirim ke modal
+        const rowIdx = allRows.length - 1 - i; // index di allRows (reversed)
 
         return `
-            <tr>
+            <tr class="table-row-clickable" onclick="bukaModal(${allRows.length - 1 - i})" title="Klik untuk detail">
                 <td style="color:#64748b;font-size:0.78rem;font-weight:600">${i + 1}</td>
                 <td style="white-space:nowrap;color:#94a3b8;font-size:0.82rem">${tanggal}</td>
                 <td><span class="pesantren-tag" title="${r.namaPesantren}">${pesantrenShort}</span></td>
@@ -975,25 +977,35 @@ function setupTableFilter() {
     const searchEl  = document.getElementById('tableSearch');
     const filterP   = document.getElementById('filterPesantren');
     const filterS   = document.getElementById('filterStatus');
+    const filterB   = document.getElementById('filterBulan'); // filter bulan baru
 
     const applyFilter = () => {
         const q  = (searchEl.value || '').toLowerCase();
         const fp = (filterP.value || '').toLowerCase();
         const fs = (filterS.value || '').toLowerCase();
+        const fb = filterB ? (filterB.value || '') : ''; // nilai bulan (mis. "06")
 
         filteredRows = allRows.filter(r => {
             const pesantren = (r.namaPesantren || '').toLowerCase();
             const statusA   = (r.statusAkhir || '').toLowerCase();
             const statusP   = (r.statusPengobatan || '').toLowerCase();
             const keluhan   = (r.keluhan || '').toLowerCase();
+            const kelas     = (r.kelas || '').toLowerCase();
 
-            const matchQ  = !q  || pesantren.includes(q) || statusA.includes(q) || statusP.includes(q) || keluhan.includes(q);
+            // Cocokkan bulan dari tanggalLaporan
+            let matchFB = true;
+            if (fb) {
+                const monthKey = parseMonthKey(r.tanggalLaporan || r.timestamp || '');
+                matchFB = monthKey ? monthKey.endsWith('-' + fb) : false;
+            }
+
+            const matchQ  = !q  || pesantren.includes(q) || statusA.includes(q) ||
+                            statusP.includes(q) || keluhan.includes(q) || kelas.includes(q);
             const matchFP = !fp || pesantren.includes(fp);
             const matchFS = !fs || statusA.includes(fs) || statusP.includes(fs);
-            return matchQ && matchFP && matchFS;
+            return matchQ && matchFP && matchFS && matchFB;
         });
         renderTable(filteredRows);
-        // Don't re-call setupTableFilter (avoid infinite loop)
         attachFilterListeners();
     };
 
@@ -1001,9 +1013,12 @@ function setupTableFilter() {
         searchEl.removeEventListener('input', applyFilter);
         filterP.removeEventListener('change', applyFilter);
         filterS.removeEventListener('change', applyFilter);
+        if (filterB) filterB.removeEventListener('change', applyFilter);
+
         searchEl.addEventListener('input', applyFilter);
         filterP.addEventListener('change', applyFilter);
         filterS.addEventListener('change', applyFilter);
+        if (filterB) filterB.addEventListener('change', applyFilter);
     };
 
     attachFilterListeners();
@@ -1055,3 +1070,342 @@ function updateLastUpdate() {
     const thn   = now.getFullYear();
     el.textContent = `Terakhir diperbarui: ${tgl} ${bln} ${thn} pukul ${jam}:${menit} WITA`;
 }
+
+// =============================================
+// MODAL DETAIL SANTRI
+// =============================================
+function bukaModal(rowIndex) {
+    const r = allRows[rowIndex];
+    if (!r) return;
+
+    const tanggal = formatTanggal(r.tanggalLaporan || r.timestamp);
+    const genderIcon = getGenderIcon(r.jenisKelamin);
+    const statusAkhirBadge = buildStatusBadge(r.statusAkhir, 'akhir');
+    const statusPengobatanBadge = buildStatusBadge(r.statusPengobatan, 'pengobatan');
+    const sembuh = (r.statusAkhir || '').toLowerCase().includes('sembuh');
+
+    document.getElementById('modalBody').innerHTML = `
+        <div class="modal-status-bar ${sembuh ? 'sembuh' : 'berobat'}">
+            ${sembuh
+                ? '<i class="fas fa-check-circle"></i> Pasien Sudah Sembuh'
+                : '<i class="fas fa-procedures"></i> Masih Dalam Pengobatan'}
+        </div>
+        <div class="modal-info-grid">
+            <div class="modal-info-item">
+                <div class="modal-info-label"><i class="fas fa-calendar-alt"></i> Tanggal Laporan</div>
+                <div class="modal-info-value">${tanggal}</div>
+            </div>
+            <div class="modal-info-item">
+                <div class="modal-info-label"><i class="fas fa-mosque"></i> Pondok Pesantren</div>
+                <div class="modal-info-value">${r.namaPesantren || '-'}</div>
+            </div>
+            <div class="modal-info-item">
+                <div class="modal-info-label">${genderIcon} Jenis Kelamin</div>
+                <div class="modal-info-value">${r.jenisKelamin || '-'}</div>
+            </div>
+            <div class="modal-info-item">
+                <div class="modal-info-label"><i class="fas fa-graduation-cap"></i> Kelas / Tingkat</div>
+                <div class="modal-info-value">${r.kelas || '-'}</div>
+            </div>
+            <div class="modal-info-item modal-info-full">
+                <div class="modal-info-label"><i class="fas fa-stethoscope"></i> Keluhan / Gejala</div>
+                <div class="modal-info-value">${r.keluhan || '-'}</div>
+            </div>
+            <div class="modal-info-item">
+                <div class="modal-info-label"><i class="fas fa-notes-medical"></i> Status Akhir</div>
+                <div class="modal-info-value">${statusAkhirBadge}</div>
+            </div>
+            <div class="modal-info-item">
+                <div class="modal-info-label"><i class="fas fa-pills"></i> Status Pengobatan</div>
+                <div class="modal-info-value">${statusPengobatanBadge}</div>
+            </div>
+            ${r.pengendalian ? `
+            <div class="modal-info-item modal-info-full">
+                <div class="modal-info-label"><i class="fas fa-shield-alt"></i> Pengendalian</div>
+                <div class="modal-info-value">${r.pengendalian}</div>
+            </div>` : ''}
+            ${r.kelurahan ? `
+            <div class="modal-info-item">
+                <div class="modal-info-label"><i class="fas fa-map-marker-alt"></i> Kelurahan</div>
+                <div class="modal-info-value">${r.kelurahan}</div>
+            </div>` : ''}
+        </div>
+        <div class="modal-privacy-note">
+            <i class="fas fa-lock"></i>
+            Data nama pasien tidak ditampilkan untuk menjaga privasi sesuai regulasi kesehatan.
+        </div>
+    `;
+
+    const overlay = document.getElementById('modalOverlay');
+    overlay.classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function tutupModal(e) {
+    if (e && e.target !== document.getElementById('modalOverlay') &&
+        !e.target.closest('.modal-close')) return;
+    const overlay = document.getElementById('modalOverlay');
+    if (overlay) overlay.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+// Tutup modal dengan tombol Escape
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') tutupModal({target: document.getElementById('modalOverlay')});
+});
+
+// =============================================
+// CETAK / PRINT LAPORAN
+// =============================================
+function cetakLaporan() {
+    const now = new Date();
+    const tgl = `${now.getDate()} ${BULAN_FULL[now.getMonth()]} ${now.getFullYear()}`;
+    const jam = `${String(now.getHours()).padStart(2,'0')}:${String(now.getMinutes()).padStart(2,'0')} WITA`;
+
+    // Kumpulkan data yang sedang ditampilkan (filteredRows)
+    const rows = [...filteredRows].reverse();
+    const totalKasus = rows.length;
+    const sembuh  = rows.filter(r => (r.statusAkhir||'').toLowerCase().includes('sembuh')).length;
+    const berobat = rows.filter(r => (r.statusPengobatan||'').toLowerCase().includes('berobat')).length;
+    const pct = totalKasus > 0 ? Math.round((sembuh/totalKasus)*100) : 0;
+
+    const tableRows = rows.map((r, i) => {
+        const tgl = formatTanggal(r.tanggalLaporan || r.timestamp);
+        const ps  = getPesantrenShort(r.namaPesantren);
+        const statusA = (r.statusAkhir||'').toLowerCase().includes('sembuh') ? '✓ Sembuh' : (r.statusAkhir || '-');
+        const statusP = (r.statusPengobatan||'').toLowerCase().includes('berobat') ? 'Berobat' : (r.statusPengobatan || '-');
+        return `<tr>
+            <td>${i+1}</td>
+            <td>${tgl}</td>
+            <td>${ps}</td>
+            <td>${r.kelas||'-'}</td>
+            <td>${r.jenisKelamin||'-'}</td>
+            <td>${r.keluhan||'-'}</td>
+            <td>${statusA}</td>
+            <td>${statusP}</td>
+        </tr>`;
+    }).join('');
+
+    const win = window.open('', '_blank', 'width=1000,height=700');
+    win.document.write(`<!DOCTYPE html><html lang="id"><head>
+        <meta charset="UTF-8">
+        <title>Laporan GASTREN — ${tgl}</title>
+        <style>
+            * { margin:0; padding:0; box-sizing:border-box; }
+            body { font-family: 'Times New Roman', serif; font-size: 11pt; color: #000; background: #fff; }
+            .kop { display:flex; align-items:center; border-bottom: 4px solid #000; padding-bottom: 8px; margin-bottom: 16px; }
+            .kop-text { flex:1; text-align:center; }
+            .kop-text h1 { font-size: 14pt; font-weight: bold; letter-spacing: 1px; }
+            .kop-text h2 { font-size: 18pt; font-weight: bold; text-transform:uppercase; }
+            .kop-text p  { font-size: 10pt; }
+            .judul { text-align:center; margin: 12px 0 4px; }
+            .judul h3 { font-size: 13pt; font-weight:bold; text-decoration:underline; text-transform:uppercase; }
+            .periode { text-align:center; font-size:10pt; margin-bottom:14px; color:#333; font-style:italic; }
+            .ringkasan { display:flex; gap:16px; margin-bottom:16px; }
+            .ring-box { flex:1; border:1px solid #000; padding:8px; text-align:center; }
+            .ring-box .val { font-size:20pt; font-weight:bold; }
+            .ring-box .lbl { font-size:9pt; }
+            table { width:100%; border-collapse:collapse; margin-bottom:20px; font-size:10pt; }
+            th { background:#1a1a2e; color:#fff; padding:6px 4px; text-align:center; border:1px solid #000; }
+            td { padding:5px 4px; border:1px solid #ccc; }
+            tr:nth-child(even) td { background:#f5f5f5; }
+            .footer-sign { display:flex; justify-content:space-between; margin-top:40px; }
+            .sign-box { text-align:center; width:240px; }
+            .sign-box .sign-line { border-top:1px solid #000; margin-top:60px; padding-top:4px; }
+            .sign-box .sign-name { font-weight:bold; }
+            .sign-box .sign-nip  { font-size:9pt; }
+            @media print {
+                body { margin: 1cm 1.5cm; }
+                .no-print { display:none; }
+            }
+        </style>
+    </head><body>
+        <div class="no-print" style="background:#f59e0b;color:#000;padding:8px 16px;font-family:sans-serif;font-size:12px">
+            ⚠️ Tekan <strong>Ctrl+P</strong> (atau <strong>⌘P</strong> di Mac) untuk cetak / simpan PDF
+        </div>
+        <div style="padding:20px">
+        <div class="kop">
+            <div class="kop-text">
+                <p>PEMERINTAH KOTA BANJARBARU</p>
+                <p>DINAS KESEHATAN</p>
+                <h2>PUSKESMAS BANJARBARU SELATAN</h2>
+                <p>Jalan Rambai No.1 Telp.(0511) 4772381 Banjarbaru Kode Pos. 70713</p>
+            </div>
+        </div>
+        <div class="judul">
+            <h3>LAPORAN PROGRAM GASTREN</h3>
+            <p style="font-size:11pt;font-style:italic">(Gerakan Anti Scabies Pondok Pesantren)</p>
+        </div>
+        <div class="periode">Tanggal Cetak: ${tgl} Pukul ${jam} &nbsp;|&nbsp; Total data ditampilkan: ${totalKasus} kasus</div>
+        <div class="ringkasan">
+            <div class="ring-box"><div class="val">${totalKasus}</div><div class="lbl">Total Kasus</div></div>
+            <div class="ring-box"><div class="val">${sembuh}</div><div class="lbl">Sembuh</div></div>
+            <div class="ring-box"><div class="val">${berobat}</div><div class="lbl">Berobat</div></div>
+            <div class="ring-box"><div class="val">${pct}%</div><div class="lbl">Tingkat Sembuh</div></div>
+        </div>
+        <table>
+            <thead>
+                <tr>
+                    <th>No</th><th>Tanggal</th><th>Pondok Pesantren</th>
+                    <th>Kelas</th><th>JK</th><th>Keluhan</th>
+                    <th>Status Akhir</th><th>Pengobatan</th>
+                </tr>
+            </thead>
+            <tbody>${tableRows}</tbody>
+        </table>
+        <div class="footer-sign">
+            <div class="sign-box">
+                <p>Mengetahui,</p>
+                <p>Penanggung Jawab Program</p>
+                <div class="sign-line">
+                    <p class="sign-name">Sri Minarni, SKM</p>
+                    <p class="sign-nip">NIP. 19790315 200604 2 023</p>
+                </div>
+            </div>
+            <div class="sign-box">
+                <p>Banjarbaru, ${tgl}</p>
+                <p>Kepala Puskesmas Banjarbaru Selatan</p>
+                <div class="sign-line">
+                    <p class="sign-name">dr. Hernita Indriani</p>
+                    <p class="sign-nip">NIP. 19851001 201402 2 005</p>
+                </div>
+            </div>
+        </div>
+        </div>
+    </body></html>`);
+    win.document.close();
+    setTimeout(() => win.print(), 800);
+}
+
+// =============================================
+// GRAFIK TREN PENYEMBUHAN BULANAN (LINE CHART)
+// =============================================
+let trendChart = null;
+
+function buildTrendChart(stats) {
+    const ctx = document.getElementById('trendChart');
+    if (!ctx) return;
+
+    const monthKeys = Object.keys(stats.perBulan).sort();
+    const labels = monthKeys.map(key => {
+        const [y, m] = key.split('-');
+        return `${BULAN[parseInt(m) - 1]} '${y.slice(2)}`;
+    });
+
+    // Hitung jumlah sembuh dan total per bulan dari allRows
+    const sembuhPerBulan  = {};
+    const totalPerBulan   = {};
+    monthKeys.forEach(k => { sembuhPerBulan[k] = 0; totalPerBulan[k] = 0; });
+
+    allRows.forEach(r => {
+        const key = parseMonthKey(r.tanggalLaporan || r.timestamp || '');
+        if (!key || !totalPerBulan.hasOwnProperty(key)) return;
+        totalPerBulan[key]++;
+        if ((r.statusAkhir || '').toLowerCase().includes('sembuh')) sembuhPerBulan[key]++;
+    });
+
+    const pctSembuh = monthKeys.map(k => {
+        const total = totalPerBulan[k];
+        return total > 0 ? Math.round((sembuhPerBulan[k] / total) * 100) : 0;
+    });
+
+    const totalData   = monthKeys.map(k => totalPerBulan[k]);
+    const sembuhData  = monthKeys.map(k => sembuhPerBulan[k]);
+
+    if (trendChart) trendChart.destroy();
+    trendChart = new Chart(ctx.getContext('2d'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Total Kasus',
+                    data: totalData,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245,158,11,0.12)',
+                    borderWidth: 2.5,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: '#f59e0b',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'yKasus'
+                },
+                {
+                    label: 'Sudah Sembuh',
+                    data: sembuhData,
+                    borderColor: '#22c55e',
+                    backgroundColor: 'rgba(34,197,94,0.1)',
+                    borderWidth: 2.5,
+                    pointRadius: 5,
+                    pointHoverRadius: 8,
+                    pointBackgroundColor: '#22c55e',
+                    fill: true,
+                    tension: 0.4,
+                    yAxisID: 'yKasus'
+                },
+                {
+                    label: '% Penyembuhan',
+                    data: pctSembuh,
+                    borderColor: '#0ea5e9',
+                    backgroundColor: 'transparent',
+                    borderWidth: 2,
+                    borderDash: [6, 3],
+                    pointRadius: 4,
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: '#0ea5e9',
+                    tension: 0.4,
+                    yAxisID: 'yPct'
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: {
+                    labels: { color: '#cbd5e1', font: { family: 'Inter', size: 11 }, padding: 16, boxWidth: 12 }
+                },
+                tooltip: {
+                    ...darkTooltip(),
+                    callbacks: {
+                        label: ctx => {
+                            if (ctx.dataset.label === '% Penyembuhan') return ` Tingkat Sembuh: ${ctx.raw}%`;
+                            return ` ${ctx.dataset.label}: ${ctx.raw} orang`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                yKasus: {
+                    type: 'linear',
+                    position: 'left',
+                    beginAtZero: true,
+                    ticks: {
+                        color: '#94a3b8', font: { family: 'Inter', size: 11 },
+                        stepSize: 1, callback: v => Number.isInteger(v) ? v : null
+                    },
+                    grid: { color: 'rgba(255,255,255,0.07)' },
+                    title: { display: true, text: 'Jumlah Kasus', color: '#64748b', font: { size: 10 } }
+                },
+                yPct: {
+                    type: 'linear',
+                    position: 'right',
+                    min: 0, max: 100,
+                    ticks: {
+                        color: '#0ea5e9', font: { family: 'Inter', size: 11 },
+                        callback: v => v + '%'
+                    },
+                    grid: { display: false },
+                    title: { display: true, text: '% Sembuh', color: '#0ea5e9', font: { size: 10 } }
+                },
+                x: {
+                    ticks: { color: '#94a3b8', font: { family: 'Inter', size: 11 } },
+                    grid:  { color: 'rgba(255,255,255,0.04)' }
+                }
+            }
+        }
+    });
+}
+

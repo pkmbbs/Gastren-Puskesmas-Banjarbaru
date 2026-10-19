@@ -202,8 +202,8 @@
                     </div>
                 </div>
 
-                <!-- Chart 2-4: 3 Donut Charts -->
-                <div class="charts-grid-3">
+                <!-- Chart 2-3: 2 Donut Charts (gender dihapus — pesantren khusus laki-laki) -->
+                <div class="charts-grid-2">
                     <div class="chart-card">
                         <div class="chart-card-header">
                             <h3><i class="fas fa-mosque"></i> Per Pesantren</h3>
@@ -211,15 +211,6 @@
                         </div>
                         <div class="chart-wrap chart-wrap-sm">
                             <canvas id="pieChart"></canvas>
-                        </div>
-                    </div>
-                    <div class="chart-card">
-                        <div class="chart-card-header">
-                            <h3><i class="fas fa-venus-mars"></i> Jenis Kelamin</h3>
-                            <span class="chart-badge">Distribusi</span>
-                        </div>
-                        <div class="chart-wrap chart-wrap-sm">
-                            <canvas id="genderChart"></canvas>
                         </div>
                     </div>
                     <div class="chart-card">
@@ -243,6 +234,17 @@
                         <canvas id="keluhanChart"></canvas>
                     </div>
                     <div id="keluhanEmpty" style="display:none;text-align:center;padding:40px;color:#475569;font-style:italic">Belum ada data keluhan</div>
+                </div>
+
+                <!-- Chart 6: Tren Penyembuhan (Line) -->
+                <div class="chart-card chart-card-full">
+                    <div class="chart-card-header">
+                        <h3><i class="fas fa-chart-line"></i> Tren Penyembuhan Bulanan</h3>
+                        <span class="chart-badge">6 Bulan Terakhir</span>
+                    </div>
+                    <div class="chart-wrap" style="height:260px">
+                        <canvas id="trendChart"></canvas>
+                    </div>
                 </div>
 
             </div>
@@ -291,6 +293,24 @@
                                 <option value="Sembuh">Sembuh</option>
                                 <option value="Berobat">Sedang Berobat</option>
                             </select>
+                            <select id="filterBulan" class="table-filter-sel">
+                                <option value="">Semua Bulan</option>
+                                <option value="01">Januari</option>
+                                <option value="02">Februari</option>
+                                <option value="03">Maret</option>
+                                <option value="04">April</option>
+                                <option value="05">Mei</option>
+                                <option value="06">Juni</option>
+                                <option value="07">Juli</option>
+                                <option value="08">Agustus</option>
+                                <option value="09">September</option>
+                                <option value="10">Oktober</option>
+                                <option value="11">November</option>
+                                <option value="12">Desember</option>
+                            </select>
+                            <button id="btnCetak" class="btn-cetak" onclick="cetakLaporan()" title="Cetak / Download PDF">
+                                <i class="fas fa-print"></i> Cetak
+                            </button>
                         </div>
                     </div>
                     <div class="table-responsive">
@@ -429,6 +449,24 @@
     <button class="back-to-top" id="backToTop" aria-label="Kembali ke atas">
         <i class="fas fa-chevron-up"></i>
     </button>
+
+    <!-- Modal Detail Santri -->
+    <div class="modal-overlay" id="modalOverlay" onclick="tutupModal(event)">
+        <div class="modal-box">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <i class="fas fa-user-injured"></i>
+                    <span>Detail Data Kasus</span>
+                </div>
+                <button class="modal-close" onclick="tutupModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body" id="modalBody">
+                <!-- Diisi oleh JS -->
+            </div>
+        </div>
+    </div>
 
     <!-- Scripts -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>

@@ -1141,3 +1141,192 @@ ul { list-style: none; }
     .section-title { font-size: 1.4rem; }
     .rekap-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* =============================================
+   FITUR BARU — Oktober 2026
+   Modal Detail, Tombol Cetak, Filter Bulan,
+   Grafik Tren Penyembuhan, Row Clickable
+   ============================================= */
+
+/* ── Tombol Cetak ─────────────────────────── */
+.btn-cetak {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 8px 14px;
+    background: linear-gradient(135deg, #f59e0b, #d97706);
+    color: #000;
+    border: none;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    font-family: 'Inter', sans-serif;
+    cursor: pointer;
+    transition: all 0.2s;
+    white-space: nowrap;
+}
+.btn-cetak:hover {
+    background: linear-gradient(135deg, #fcd34d, #f59e0b);
+    transform: translateY(-1px);
+    box-shadow: 0 4px 12px rgba(245,158,11,0.4);
+}
+.btn-cetak:active { transform: translateY(0); }
+
+/* ── Baris tabel bisa diklik ──────────────── */
+.table-row-clickable {
+    cursor: pointer;
+    transition: background 0.15s;
+}
+.table-row-clickable:hover td {
+    background: rgba(245, 158, 11, 0.08) !important;
+}
+.table-row-clickable:hover td:first-child {
+    border-left: 3px solid #f59e0b;
+}
+
+/* ── Modal Overlay ────────────────────────── */
+.modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.75);
+    backdrop-filter: blur(4px);
+    z-index: 9000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s;
+}
+.modal-overlay.open {
+    opacity: 1;
+    pointer-events: all;
+}
+.modal-box {
+    background: #0d1b35;
+    border: 1px solid rgba(245,158,11,0.25);
+    border-radius: 16px;
+    width: 100%;
+    max-width: 560px;
+    max-height: 90vh;
+    overflow-y: auto;
+    transform: translateY(24px) scale(0.97);
+    transition: transform 0.25s;
+    box-shadow: 0 24px 64px rgba(0,0,0,0.6);
+}
+.modal-overlay.open .modal-box {
+    transform: translateY(0) scale(1);
+}
+.modal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 20px 24px 16px;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+}
+.modal-title {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1rem;
+    font-weight: 700;
+    color: #fcd34d;
+    font-family: 'Poppins', sans-serif;
+}
+.modal-title i { color: #f59e0b; }
+.modal-close {
+    background: rgba(255,255,255,0.06);
+    border: 1px solid rgba(255,255,255,0.1);
+    color: #94a3b8;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.85rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s;
+}
+.modal-close:hover { background: rgba(239,68,68,0.2); color: #f87171; border-color: rgba(239,68,68,0.3); }
+
+.modal-body { padding: 0 24px 24px; }
+
+.modal-status-bar {
+    margin: 16px 0;
+    padding: 10px 16px;
+    border-radius: 10px;
+    font-weight: 600;
+    font-size: 0.88rem;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+.modal-status-bar.sembuh {
+    background: rgba(34,197,94,0.12);
+    color: #4ade80;
+    border: 1px solid rgba(34,197,94,0.25);
+}
+.modal-status-bar.berobat {
+    background: rgba(14,165,233,0.12);
+    color: #38bdf8;
+    border: 1px solid rgba(14,165,233,0.25);
+}
+
+.modal-info-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+.modal-info-item {
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.07);
+    border-radius: 10px;
+    padding: 12px 14px;
+}
+.modal-info-full { grid-column: 1 / -1; }
+.modal-info-label {
+    font-size: 0.75rem;
+    color: #64748b;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+.modal-info-label i { color: #f59e0b; }
+.modal-info-value {
+    font-size: 0.9rem;
+    color: #e2e8f0;
+    font-weight: 500;
+    line-height: 1.4;
+}
+.modal-privacy-note {
+    font-size: 0.75rem;
+    color: #475569;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 10px 12px;
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    border: 1px solid rgba(255,255,255,0.05);
+}
+.modal-privacy-note i { color: #f59e0b; }
+
+@media (max-width: 520px) {
+    .modal-info-grid { grid-template-columns: 1fr; }
+    .modal-info-full { grid-column: 1; }
+}
+
+/* ── 2-column chart grid (setelah hapus gender chart) ─── */
+.charts-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    margin-bottom: 20px;
+}
+@media (max-width: 640px) {
+    .charts-grid-2 { grid-template-columns: 1fr; }
+}
